@@ -1,5 +1,5 @@
 from flask import Flask, request, Response
-from flask_cors import CORS
+import flask_cors
 from uuid import uuid1
 from threading import Thread, Timer
 import time
@@ -12,7 +12,7 @@ from database import delete_item, get_result, get_progress, set_result, create_i
 from xispeech import XiSpeechSynthesizer
 
 s = XiSpeechSynthesizer()  # load and arrange audio files
-CORS(app)
+flask_cors.CORS(app)
 print("初始化完成")
 
 
@@ -178,14 +178,7 @@ def delete_result():
 
 @app.route("/easy_get", methods=['GET'])
 def easy_get():
-    json = request.get_json()
-    if json is None or "text" not in json:
-        result = {
-            "request_successful": False,
-            "message": "文本缺失"
-        }
-        return result
-    text = json["text"]
+    text = request.args.get("text", "")
     if len(text) > 1000:
         result = {
             "request_successful": False,
@@ -195,15 +188,15 @@ def easy_get():
     request_id = str(uuid1())
     try:
         TaskManipulator.start(text, request_id)
+        time.sleep(0.25)
         while not get_progress(request_id)["finished"]:
             time.sleep(0.25)
         audio = get_result(request_id)["audio"]
         content = base64.b64decode(audio)
-        return Response(content, mimetype="audio/mpeg3")
+        return Response(content, mimetype="audio/x-mpeg")
     except Exception as e:
         result = {
             "request_successful": False,
             "message": str(e)
         }
         return result
-    
