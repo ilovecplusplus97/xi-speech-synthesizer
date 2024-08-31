@@ -1,7 +1,9 @@
-from flask import Flask, request
+from flask import Flask, request, Response
 from flask_cors import CORS
 from uuid import uuid1
 from threading import Thread, Timer
+import time
+import base64
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///result.db'
@@ -173,3 +175,35 @@ def delete_result():
             "message": str(e)
         }
     return result
+
+@app.route("/easy_get", methods=['GET'])
+def easy_get():
+    json = request.get_json()
+    if json is None or "text" not in json:
+        result = {
+            "request_successful": False,
+            "message": "文本缺失"
+        }
+        return result
+    text = json["text"]
+    if len(text) > 1000:
+        result = {
+            "request_successful": False,
+            "message": "文本不得超过1000字"
+        }
+        return result
+    request_id = str(uuid1())
+    try:
+        TaskManipulator.start(text, request_id)
+        while not get_progress(request_id)["finished"]:
+            time.sleep(0.25)
+        audio = get_result(request_id)["audio"]
+        content = base64.b64decode(audio)
+        return Response(content, mimetype="audio/mpeg3")
+    except Exception as e:
+        result = {
+            "request_successful": False,
+            "message": str(e)
+        }
+        return result
+    
